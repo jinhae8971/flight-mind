@@ -51,15 +51,25 @@ def download_one_day(
         with zipfile.ZipFile(io.BytesIO(r.content)) as z:
             csv_name = z.namelist()[0]
             with z.open(csv_name) as f:
+                # Binance Vision CSV는 2025년부터 헤더 포함 형식.
+                # 기존 데이터는 헤더 없음 — 자동 감지.
+                first_bytes = f.read(20).decode("utf-8", errors="ignore")
+                f_pos = io.BytesIO()  # rewind 위해 새 buffer
+            with z.open(csv_name) as f:
+                has_header = first_bytes.lower().startswith("open_time")
                 df = pd.read_csv(
                     f,
-                    header=None,
-                    names=[
+                    header=0 if has_header else None,
+                    names=None if has_header else [
                         "open_time", "open", "high", "low", "close", "volume",
                         "close_time", "quote_volume", "trades",
                         "taker_buy_volume", "taker_buy_quote_volume", "ignore",
                     ],
                 )
+
+        # 컬럼명 정규화 — 신형(count) → 구형(trades)
+        if "count" in df.columns:
+            df = df.rename(columns={"count": "trades"})
 
         df["open_time"] = pd.to_datetime(df["open_time"], unit="ms")
         df = df.set_index("open_time")

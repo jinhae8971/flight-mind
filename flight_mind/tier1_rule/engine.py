@@ -108,32 +108,38 @@ def rule_rsi_divergence(df: pd.DataFrame) -> TierOutput:
     if len(df) < 100:
         return TierOutput(0.0, "none", {"reason": "insufficient_data"})
 
-    close = df["close"].astype(float)
-    rsi = calculate_rsi(close, period=TIER1.rsi_period)
+    try:
+        close = df["close"].astype(float)
+        rsi_series = calculate_rsi(close, period=TIER1.rsi_period)
 
-    divs = find_divergences(
-        prices=close,
-        rsi=rsi,
-        rsi_period=TIER1.rsi_period,
-        max_lag=3,
-        include_hidden=True,
-    )
+        divs = find_divergences(
+            prices=close,
+            rsi=rsi_series,
+            rsi_period=TIER1.rsi_period,
+            max_lag=3,
+            include_hidden=True,
+        )
+    except Exception as e:
+        # 라이브러리 내부 오류 시 graceful degradation
+        return TierOutput(0.0, "none", {"reason": f"rsi_div_error: {type(e).__name__}"})
 
-    if divs.empty:
+    # 빈 결과 처리 — DataFrame, list, ndarray 모두 대응
+    if divs is None or (hasattr(divs, "empty") and divs.empty) or len(divs) == 0:
         return TierOutput(0.0, "none", {"reason": "no_divergence"})
 
-    # 최근 5봉 내 다이버전스만 채택
-    last_idx = df.index[-1]
-    recent_divs = divs[divs.index >= df.index[-5]] if hasattr(divs, "index") else divs
+    # DataFrame 형태일 때만 필터링 시도
+    try:
+        if hasattr(divs, "iloc"):
+            last = divs.iloc[-1]
+            div_type = str(last.get("type", "")).lower() if hasattr(last, "get") else ""
+        else:
+            div_type = ""
+    except Exception:
+        return TierOutput(0.0, "none", {"reason": "no_divergence_format"})
 
-    if recent_divs.empty:
-        return TierOutput(0.0, "none", {"reason": "no_recent_divergence"})
-
-    # bullish_divergence → long, bearish_divergence → short
-    last = recent_divs.iloc[-1]
-    if "bullish" in str(last.get("type", "")).lower():
+    if "bullish" in div_type:
         return TierOutput(0.85, "long", {"divergence": "bullish"})
-    if "bearish" in str(last.get("type", "")).lower():
+    if "bearish" in div_type:
         return TierOutput(0.85, "short", {"divergence": "bearish"})
 
     return TierOutput(0.0, "none", {"reason": "ambiguous_divergence"})
