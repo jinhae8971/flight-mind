@@ -34,6 +34,14 @@ htmlcov/
 data/raw/
 data/processed/
 data/models/
+data/audit.db
+data/audit.db-wal
+data/audit.db-shm
+data/vault.json
+data/integrated_backtest_results.json
+data/.pipeline_state.json
+data/flight_mind.duckdb
+data/flight_mind.duckdb.wal
 *.parquet
 *.duckdb
 *.duckdb.wal
