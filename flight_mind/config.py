@@ -60,14 +60,19 @@ class RiskConfig(BaseModel):
 # Tier Weights & Thresholds
 # =============================================================================
 class FusionConfig(BaseModel):
-    """Bayesian Confluence Layer — 영길님 결정: 0.85 (Conservative)"""
+    """Bayesian Confluence Layer — 영길님 결정: 0.85 (Conservative)
+
+    3-Tier 시스템 (Tier 3 호가창 제외):
+      - 영길님 보수 정책에 적합 — 운영 복잡도 ↓, 신뢰도 ↑
+      - Tier 3는 ROI 대비 인프라 부담이 너무 큼 (24/7 WebSocket, 12GB/월)
+    """
     threshold: float = 0.85
 
-    # Tier weights — sum to 1.0
-    w_tier1_rule: float = 0.30
-    w_tier2_pattern: float = 0.30
-    w_tier3_microstr: float = 0.20
-    w_tier4_regime: float = 0.20
+    # Tier weights — sum to 1.0 (Tier 3 제외 후 재분배)
+    w_tier1_rule: float = 0.35       # 0.30 → 0.35 (검증된 룰 비중 ↑)
+    w_tier2_pattern: float = 0.35    # 0.30 → 0.35 (학계 SOTA 90% 정확도)
+    w_tier3_microstr: float = 0.0    # 제외 (legacy 호환을 위해 필드 유지)
+    w_tier4_regime: float = 0.30     # 0.20 → 0.30 (횡보 차단 게이트 가치 ↑)
 
     # Disagreement penalty
     require_t1_t2_agree: bool = True   # T1, T2 부호 반대 시 강제 hold
@@ -105,21 +110,6 @@ class Tier2Config(BaseModel):
 
     # Plait fine-tuning
     plait_log_weight: float = 5.0
-
-
-class Tier3Config(BaseModel):
-    """Microstructure TCN"""
-    lob_levels: int = 10               # 10단계 bid/ask
-    snapshot_window: int = 100         # 직전 100 스냅샷
-    sample_interval_ms: int = 500      # 50ms → 500ms 다운샘플 (저장 부담 완화)
-    prediction_horizon_ms: int = 2000  # 2초 후 예측
-
-    tcn_layers: int = 6
-    tcn_kernel: int = 3
-    tcn_channels: int = 64
-
-    epochs: int = 30
-    batch_size: int = 256
 
 
 class Tier4Config(BaseModel):
@@ -176,7 +166,6 @@ RISK = RiskConfig()
 FUSION = FusionConfig()
 TIER1 = Tier1Config()
 TIER2 = Tier2Config()
-TIER3 = Tier3Config()
 TIER4 = Tier4Config()
 EXCHANGE = ExchangeConfig()
 SETTINGS = Settings()

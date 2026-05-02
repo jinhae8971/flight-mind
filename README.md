@@ -1,6 +1,6 @@
 # Flight-Mind 🛫
 
-**4-Tier Hybrid Trading System** inspired by 플라이트(Flight)의 매매법.
+**3-Tier Hybrid Trading System** inspired by 플라이트(Flight)의 매매법.
 
 > 50만원 → 100억의 매매법을 룰 엔진과 딥러닝으로 70~85% 재현하는 시스템
 
@@ -8,9 +8,9 @@
 
 플라이트 전략의 본질은 두 가지로 분해된다:
 1. **명시적 룰** (추세선, RSI 다이버전스, 거래량) — 30%
-2. **암묵적 직관** (캔들 모양, 호가창 흐름, 시장 국면) — 70%
+2. **암묵적 직관** (캔들 모양, 시장 국면) — 70%
 
-Flight-Mind는 (1)을 룰 엔진으로, (2)를 딥러닝(CNN/TCN/Transformer)으로 모방한다.
+Flight-Mind는 (1)을 룰 엔진으로, (2)를 딥러닝(CNN/Transformer)으로 모방한다.
 
 ## Architecture
 
@@ -19,15 +19,17 @@ Flight-Mind는 (1)을 룰 엔진으로, (2)를 딥러닝(CNN/TCN/Transformer)으
 │       Bayesian Confluence Fusion            │
 │       Threshold: 0.85 (Conservative)        │
 └─────────────────────────────────────────────┘
-       ▲          ▲           ▲          ▲
-   ┌───┴────┐ ┌───┴────┐ ┌───┴────┐ ┌───┴────┐
-   │ Tier 1 │ │ Tier 2 │ │ Tier 3 │ │ Tier 4 │
-   │ Rules  │ │ CNN    │ │ TCN    │ │ Transf.│
-   │ w=0.30 │ │ w=0.30 │ │ w=0.20 │ │ w=0.20 │
-   └────────┘ └────────┘ └────────┘ └────────┘
+       ▲             ▲             ▲
+   ┌───┴────┐   ┌───┴────┐   ┌───┴────┐
+   │ Tier 1 │   │ Tier 2 │   │ Tier 4 │
+   │ Rules  │   │ CNN    │   │ Transf.│
+   │ w=0.35 │   │ w=0.35 │   │ w=0.30 │
+   └────────┘   └────────┘   └────────┘
+   (룰 엔진)    (캔들 외움)   (국면 게이트)
 ```
 
 전체 설계는 [`ADR-001`](./ADR-001-flight-mind-architecture.md) 참조.
+Tier 3 (호가창 TCN) 제외 결정 근거는 [`ADR-002`](./ADR-002-exclude-tier3.md) 참조.
 
 ## Operating Parameters
 
@@ -69,15 +71,17 @@ flight-mind run --mode paper --pairs BTC/USDT
 
 ## Project Status
 
-🚧 **Phase 0 — Architecture & Scaffolding (Day 1)**
+**Phase 0 — Architecture & Scaffolding 완료** ✅
 
-- [x] ADR-001 written
-- [x] Repo scaffolding
-- [ ] Data pipeline (Day 2)
-- [ ] Tier 1 rule engine (Day 5)
-- [ ] Tier 2 CNN (Week 2)
-- [ ] Tier 3 TCN (Week 3)
-- [ ] Tier 4 Transformer + Fusion + Live (Week 4)
+- [x] ADR-001: 4-Tier 원안 + ADR-002: Tier 3 제외 결정
+- [x] Repo scaffolding + DuckDB feature store
+- [x] Tier 1 rule engine (4 sub-rules) + standalone backtest
+- [x] Tier 2 GAF-CNN (학습 파이프라인 + inference API)
+- [x] Tier 4 Regime Transformer (5-class 국면 분류)
+- [x] Bayesian Confluence Fusion (3-Tier)
+- [x] 38 unit tests passing
+- [ ] Tier 1+2+4 통합 백테스트 (다음 단계)
+- [ ] 5y 데이터 학습 + paper trading
 
 ## Disclaimer
 

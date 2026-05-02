@@ -1,9 +1,12 @@
 # ADR-001: Flight-Mind 4-Tier Hybrid Trading System Architecture
 
-**Status**: Accepted
+**Status**: ⚠️ Partially Superseded by [ADR-002](./ADR-002-exclude-tier3.md) — Tier 3 제외됨 (3-Tier 시스템으로 변경)
 **Date**: 2026-05-02
 **Author**: Younggil (with Claude as system architect)
 **Project**: `flight-mind` (Binance Futures Auto-Trading via Flight Strategy)
+
+> **Note**: 이 문서는 4-Tier 시스템의 원래 설계 의도를 보존하기 위해 그대로 유지됩니다.
+> 현재 시스템은 **3-Tier (T1 + T2 + T4)** 로 동작하며, 자세한 의사결정 근거는 ADR-002 참조.
 
 ---
 
