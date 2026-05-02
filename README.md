@@ -4,6 +4,16 @@
 
 > 50만원 → 100억의 매매법을 룰 엔진과 딥러닝으로 70~85% 재현하는 시스템
 
+## 🚀 영길님 PC에서 학습 시작
+
+```powershell
+git clone https://github.com/jinhae8971/flight-mind.git
+cd flight-mind
+.\setup_and_train.ps1
+```
+
+자세한 안내는 [`QUICK_START.md`](./QUICK_START.md) 또는 [`docs/TRAINING_GUIDE.md`](./docs/TRAINING_GUIDE.md) 참조.
+
 ## What is Flight-Mind?
 
 플라이트 전략의 본질은 두 가지로 분해된다:
