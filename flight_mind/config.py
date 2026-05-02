@@ -89,7 +89,7 @@ class Tier2Config(BaseModel):
     """Pattern Memory CNN — GAF + ResNet-18"""
     backbone: str = "resnet18"
     input_window: int = 60             # 60 캔들
-    image_size: int = 64
+    image_size: int = 60               # GAF는 정사각형, input_window와 일치 필수
     output_classes: int = 3            # long / short / neutral
 
     # Training
