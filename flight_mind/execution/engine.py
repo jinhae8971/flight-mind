@@ -24,7 +24,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Literal
 
@@ -177,7 +177,7 @@ class ExecutionEngine:
                 "bid": last * 0.9995,
                 "ask": last * 1.0005,
                 "last": last,
-                "timestamp": int(datetime.utcnow().timestamp() * 1000),
+                "timestamp": int(datetime.now(timezone.utc).timestamp() * 1000),
             }
         return self.exchange.fetch_ticker(symbol)
 
@@ -235,13 +235,55 @@ class ExecutionEngine:
         symbol: str,
         decision: FusionDecision,
         market_snapshot: dict | None = None,
+        skip_risk_gate: bool = False,
     ) -> OrderResult:
         """
         Fusion Layer 의사결정을 실제 주문으로 실행.
 
         Hold → 로그만, 주문 없음
-        Open_long/short → 시장가 진입 + TP/SL stop 주문 자동 첨부
+        Open_long/short → Risk Gate 통과 후 시장가 진입
+
+        Args:
+            skip_risk_gate: True 시 Risk Manager 검증 건너뜀 (테스트 전용,
+                            절대 production에서 사용 금지)
         """
+        # 0. Risk Gate (사전 검증) — Day 8 추가
+        if decision.action != "hold" and not skip_risk_gate:
+            from flight_mind.risk.manager import get_risk_manager
+            risk_mgr = get_risk_manager()
+            gate_result = risk_mgr.check(symbol, mode=self.mode.value)
+
+            if not gate_result.allowed:
+                CONSOLE.print(
+                    f"[bold red]🚫 Risk Gate blocked: "
+                    f"{', '.join(gate_result.blockers)}[/bold red]"
+                )
+                # 거래 결정 자체는 audit에 기록 (왜 차단됐는지 추적용)
+                log_decision(
+                    symbol=symbol,
+                    action="hold",  # Risk Gate가 강제로 hold로 변경
+                    direction=decision.direction,
+                    confluence=decision.confluence_score,
+                    tier_outputs={k: {"score": v.score, "direction": v.direction,
+                                      "signals": v.signals}
+                                  for k, v in decision.tier_outputs.items()},
+                    market_snapshot=market_snapshot,
+                    veto_reason=f"risk_gate: {'; '.join(gate_result.blockers)}",
+                    mode=self.mode.value,
+                )
+                return OrderResult(
+                    success=False,
+                    error=f"Risk Gate blocked: {gate_result.blockers}",
+                    mode=self.mode.value,
+                )
+
+            # Warnings는 진행하되 알림
+            if gate_result.warnings:
+                CONSOLE.print(
+                    f"[yellow]⚠ Risk Gate warnings: "
+                    f"{', '.join(gate_result.warnings)}[/yellow]"
+                )
+
         # 1. Audit decision (모든 결정 기록 — hold 포함)
         decision_id = log_decision(
             symbol=symbol,
@@ -347,7 +389,7 @@ class ExecutionEngine:
 
         order_id = log_order(
             decision_id=decision_id,
-            exchange_order_id=f"PAPER_{datetime.utcnow().timestamp():.0f}",
+            exchange_order_id=f"PAPER_{datetime.now(timezone.utc).timestamp():.0f}",
             symbol=symbol,
             side=side,
             order_type="market",
@@ -439,7 +481,7 @@ class ExecutionEngine:
 
             order_id = log_order(
                 decision_id=None,
-                exchange_order_id=f"PAPER_CLOSE_{datetime.utcnow().timestamp():.0f}",
+                exchange_order_id=f"PAPER_CLOSE_{datetime.now(timezone.utc).timestamp():.0f}",
                 symbol=symbol,
                 side=side,
                 order_type="market",

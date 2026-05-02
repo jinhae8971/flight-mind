@@ -10,7 +10,7 @@ Audit Logger — Order Lifecycle Tracking
 
 설계 원칙:
   - 한 번 쓴 레코드는 절대 수정하지 않음 (append-only audit trail)
-  - 모든 timestamps는 UTC ISO-8601
+  - 모든 timestamps는 UTC ISO-8601 (timezone-aware, "+00:00" 표기)
   - Tier 신호는 JSON 형태로 그대로 저장 (구조 변화에도 유연)
   - 별도 SQLite (DuckDB OLAP과 분리 — 동시성 안전)
 
@@ -26,12 +26,22 @@ import sqlite3
 import threading
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 
 AUDIT_DB_PATH = Path(__file__).resolve().parent.parent.parent / "data" / "audit.db"
+
+
+def _now_iso() -> str:
+    """현재 UTC를 SQLite DATE() 호환 ISO 형식으로 반환.
+
+    SQLite의 DATE() 함수는 'YYYY-MM-DD HH:MM:SS' 또는 'YYYY-MM-DDTHH:MM:SS'
+    형식을 인식. timezone suffix '+00:00'이나 'Z'가 있어도 보통 동작하지만,
+    둘 다 같이 있으면 NULL 반환. 일관성을 위해 '+00:00'만 사용.
+    """
+    return datetime.now(timezone.utc).isoformat()
 
 
 SCHEMA = """
@@ -156,7 +166,7 @@ def log_decision(
                 tier_outputs, market_snapshot, mode)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
-                datetime.utcnow().isoformat() + "Z",
+                _now_iso(),
                 symbol, action, direction, confluence, veto_reason,
                 json.dumps(tier_outputs, default=str),
                 json.dumps(market_snapshot, default=str) if market_snapshot else None,
@@ -192,7 +202,7 @@ def log_order(
                 error_message, raw_response, mode)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
-                datetime.utcnow().isoformat() + "Z",
+                _now_iso(),
                 decision_id, exchange_order_id, symbol, side, order_type,
                 quantity, price, status, filled_qty, avg_fill_price, fee_usdt,
                 error_message,
@@ -254,7 +264,7 @@ def log_trade_open(
                VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 decision_id, entry_order_id, symbol, direction,
-                datetime.utcnow().isoformat() + "Z",
+                _now_iso(),
                 entry_price, quantity, mode,
             ),
         )
@@ -279,7 +289,7 @@ def log_trade_close(
                WHERE id = ?""",
             (
                 exit_order_id,
-                datetime.utcnow().isoformat() + "Z",
+                _now_iso(),
                 exit_price, pnl_usdt, pnl_pct, exit_reason, fees_usdt,
                 trade_id,
             ),
@@ -318,7 +328,7 @@ def fetch_recent_trades(symbol: str | None = None, limit: int = 100) -> list[dic
 def daily_pnl_summary(date_utc: str | None = None) -> dict:
     """오늘 또는 지정일 PnL 요약"""
     if date_utc is None:
-        date_utc = datetime.utcnow().date().isoformat()
+        date_utc = datetime.now(timezone.utc).date().isoformat()
 
     with get_audit_conn() as conn:
         rows = conn.execute(

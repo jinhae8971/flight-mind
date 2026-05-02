@@ -35,7 +35,7 @@ import json
 import os
 import secrets
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from rich.console import Console
@@ -200,7 +200,7 @@ class Vault:
             "api_key": api_key,
             "secret": secret,
             "label": label,
-            "created_at": datetime.utcnow().isoformat() + "Z",
+            "created_at": datetime.now(timezone.utc).isoformat(),
             "permissions": permissions or [],
         }).encode("utf-8")
 
