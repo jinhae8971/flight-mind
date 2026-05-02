@@ -1,0 +1,89 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "flight-mind"
+version = "0.1.0"
+description = "4-Tier Hybrid Trading System inspired by Flight (50만원→100억) strategy"
+authors = [{ name = "Younggil", email = "jinhae8971@users.noreply.github.com" }]
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+
+dependencies = [
+    # Exchange & Data
+    "ccxt>=4.4.0",
+    "ccxtpro>=4.4.0; python_version < '3.13'",
+    "python-binance>=1.0.20",
+    "websockets>=12.0",
+
+    # Data Processing
+    "pandas>=2.2.0",
+    "numpy>=1.26.0",
+    "scipy>=1.13.0",
+    "duckdb>=1.0.0",
+    "pyarrow>=15.0.0",
+
+    # Technical Analysis
+    "pandas-ta>=0.3.14b",
+    "rsi-divergence-detector>=0.1.0",
+
+    # ML — Tier 2/3/4
+    "torch>=2.3.0",
+    "timm>=1.0.0",            # ResNet, ViT backbones
+    "pyts>=0.13.0",            # GAF encoding
+    "transformers>=4.40.0",
+    "scikit-learn>=1.5.0",
+    "mlflow>=2.13.0",
+
+    # Orchestration
+    "langgraph>=0.1.0",
+    "langchain-core>=0.2.0",
+    "apscheduler>=3.10.4",
+
+    # Security
+    "cryptography>=42.0",
+    "pydantic>=2.7.0",
+    "pydantic-settings>=2.3.0",
+
+    # Backend & Dashboard
+    "fastapi>=0.111.0",
+    "uvicorn[standard]>=0.30.0",
+    "python-telegram-bot>=21.0",
+
+    # Utility
+    "loguru>=0.7.2",
+    "rich>=13.7.0",
+    "typer>=0.12.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.2.0",
+    "pytest-asyncio>=0.23.0",
+    "pytest-cov>=5.0.0",
+    "ruff>=0.4.0",
+    "mypy>=1.10.0",
+    "ipykernel>=6.29.0",
+    "jupyterlab>=4.2.0",
+]
+
+[project.scripts]
+flight-mind = "flight_mind.cli:app"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["flight_mind*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP", "B", "SIM"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+addopts = "-v --tb=short"
