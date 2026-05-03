@@ -131,6 +131,7 @@ def backtest_integrated(
     mode: Mode = "realistic",
     cooldown_bars: int = 12,
     seed: int = 42,
+    signal_source: Literal["mock", "real", "auto"] = "mock",
 ) -> tuple[list[IntegratedTrade], dict]:
     """
     3-Tier 통합 백테스트.
@@ -140,6 +141,10 @@ def backtest_integrated(
       - 일일 거래 한도: 2회
       - Daily loss kill-switch: -5%
       - Cooldown after entry: 12 bars (1시간)
+
+    Args:
+        signal_source: "mock" (Day 5 oracle), "real" (학습된 모델),
+                       "auto" (모델 있으면 real, 없으면 mock fallback)
     """
     df = fetch_ohlcv(symbol, "5m")
     if df.empty:
@@ -147,10 +152,18 @@ def backtest_integrated(
 
     CONSOLE.print(
         f"[cyan]Integrated backtest on {symbol}: {len(df):,} bars, "
-        f"mode={mode}[/cyan]"
+        f"mode={mode}, signal_source={signal_source}[/cyan]"
     )
 
-    mock = get_mock_generator(mode, seed=seed)
+    # Signal generator selection
+    if signal_source == "mock":
+        sig_gen = get_mock_generator(mode, seed=seed)
+    else:
+        from flight_mind.utils.real_model_signals import get_signal_generator
+        sig_gen = get_signal_generator(
+            mode=signal_source, symbol=symbol,
+            mock_mode=mode, seed=seed,
+        )
     trades: list[IntegratedTrade] = []
     last_signal_idx = -cooldown_bars
 
@@ -190,11 +203,11 @@ def backtest_integrated(
             continue
         stats["tier1_signals"] += 1
 
-        # Tier 2 (mock CNN)
-        t2 = mock.generate_t2(df, i, future_horizon_bars=12, threshold_pct=0.5)
+        # Tier 2 (mock CNN 또는 real CNN)
+        t2 = sig_gen.generate_t2(df, i, future_horizon_bars=12, threshold_pct=0.5)
 
-        # Tier 4 (mock Regime)
-        t4 = mock.generate_t4(df, i)
+        # Tier 4 (mock Regime 또는 real Regime)
+        t4 = sig_gen.generate_t4(df, i)
 
         # Fusion
         decision = fuse(t1, t2, t4, available_balance_usdt=1750.0)
@@ -233,6 +246,12 @@ def backtest_integrated(
     metrics = compute_metrics(trades)
     metrics["pipeline_stats"] = stats
     metrics["mode"] = mode
+    metrics["signal_source"] = signal_source
+
+    # Real model 사용 시 cache hit rate도 기록
+    if signal_source != "mock" and hasattr(sig_gen, "cache_hit_rate"):
+        metrics["cache_stats"] = sig_gen.cache_hit_rate()
+
     return trades, metrics
 
 
@@ -376,6 +395,9 @@ if __name__ == "__main__":
     p.add_argument("--symbol", default="BTCUSDT")
     p.add_argument("--mode", default=None,
                    choices=["optimistic", "realistic", "pessimistic", "all"])
+    p.add_argument("--signal-source", default="mock",
+                   choices=["mock", "real", "auto"],
+                   help="mock=Day5 oracle, real=학습된 모델, auto=모델 있으면 real")
     args = p.parse_args()
 
     if args.mode is None or args.mode == "all":
@@ -384,7 +406,9 @@ if __name__ == "__main__":
         for mode in ["pessimistic", "realistic", "optimistic"]:
             CONSOLE.print(f"\n[bold cyan]━━━ {mode.upper()} ━━━[/bold cyan]")
             try:
-                _, metrics = backtest_integrated(args.symbol, mode=mode)
+                _, metrics = backtest_integrated(
+                    args.symbol, mode=mode, signal_source=args.signal_source,
+                )
                 results[mode] = metrics
             except Exception as e:
                 CONSOLE.print(f"[red]Error in {mode}: {e}[/red]")
@@ -394,5 +418,7 @@ if __name__ == "__main__":
         print_comparison_table(results, args.symbol)
         print_pipeline_diagnostics(args.symbol, results)
     else:
-        _, metrics = backtest_integrated(args.symbol, mode=args.mode)
+        _, metrics = backtest_integrated(
+            args.symbol, mode=args.mode, signal_source=args.signal_source,
+        )
         CONSOLE.print(f"\n{args.mode}: {metrics}")
